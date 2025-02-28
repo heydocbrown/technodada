@@ -1,6 +1,7 @@
 class ModelProvider:
     CURSOR = "cursor"
     OPENAI = "openai"
+    ANTHROPIC = "anthropic"
     GROK = "grok"
 
 class ModelConfig:
