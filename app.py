@@ -682,12 +682,21 @@ with col1:
                                     n=1,
                                 ).data[0].url
                             else:
-                                image_url = st.session_state.invertor.generate_contrast_image(
-                                    concept,
-                                    comparison_concept,
-                                    is_revector=st.session_state.use_revector,
-                                    custom_prompt=prompt
-                                )
+                                # Try to call with custom_prompt, and fall back to the basic call if it's not supported
+                                try:
+                                    image_url = st.session_state.invertor.generate_contrast_image(
+                                        concept,
+                                        comparison_concept,
+                                        is_revector=st.session_state.use_revector,
+                                        custom_prompt=prompt
+                                    )
+                                except TypeError:
+                                    # If custom_prompt is not supported, call without it
+                                    image_url = st.session_state.invertor.generate_contrast_image(
+                                        concept,
+                                        comparison_concept,
+                                        is_revector=st.session_state.use_revector
+                                    )
                         
                         if image_url and not image_url.startswith("Error"):
                             st.image(image_url, caption="Generated contrast image")
