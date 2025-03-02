@@ -283,132 +283,111 @@ st.title("Concept Invertor Dashboard")
 st.markdown("""
 This dashboard allows you to explore concept inversion using different LLM models.
 Input a concept and see how it transforms through various axes of meaning.
-
-*Note: This app uses various AI APIs. You can use your own API key by selecting the option in the sidebar.*
 """)
 
 # Sidebar controls
 with st.sidebar:
-    st.header("Configuration")
+    st.header("Settings")
     
-    # API Service selection
-    st.subheader("Select API Service")
+    # Comment out API Service selection
+    # # API Service selection
+    # st.subheader("Select API Service")
+    # 
+    # # Display available API services - default to the first one with a valid key
+    # default_service = next((s for s, c in api_services.items() if c["loaded"] and s != "Backblaze"), "OpenAI")
+    # st.session_state.selected_api_service = st.radio(
+    #     "Select AI service to use",
+    #     options=[s for s in api_services.keys() if s != "Backblaze"],
+    #     index=[s for s in api_services.keys() if s != "Backblaze"].index(default_service)
+    # )
     
-    # Display available API services - default to the first one with a valid key
-    default_service = next((s for s, c in api_services.items() if c["loaded"] and s != "Backblaze"), "OpenAI")
-    st.session_state.selected_api_service = st.radio(
-        "Select AI service to use",
-        options=[s for s in api_services.keys() if s != "Backblaze"],
-        index=[s for s in api_services.keys() if s != "Backblaze"].index(default_service)
-    )
+    # Set default to OpenAI
+    service = "OpenAI"
+    st.session_state.selected_api_service = service
     
-    service = st.session_state.selected_api_service
+    # Comment out required packages check
+    # # Check if required packages are installed for selected service
+    # if service == "Claude" and not is_package_installed("anthropic"):
+    #     st.warning("⚠️ The 'anthropic' package is required to use Claude models. Please run 'pip install anthropic' and restart the app.")
+    # elif service == "Grok" and not is_package_installed("xai"):
+    #     st.warning("⚠️ The 'xai' package is required to use Grok models. Please run 'pip install xai-grok' and restart the app.")
     
-    # Check if required packages are installed for selected service
-    if service == "Claude" and not is_package_installed("anthropic"):
-        st.warning("⚠️ The 'anthropic' package is required to use Claude models. Please run 'pip install anthropic' and restart the app.")
-    elif service == "Grok" and not is_package_installed("xai"):
-        st.warning("⚠️ The 'xai' package is required to use Grok models. Please run 'pip install xai-grok' and restart the app.")
+    # Comment out custom API key input
+    # # API Key handling with security in mind
+    # # Show status of owner's API key for selected service
+    # if service in st.session_state.saved_api_keys:
+    #     st.success(f"✅ App owner's {service} API key is available")
+    # else:
+    #     st.warning(f"⚠️ App owner's {service} API key is not available")
+    # 
+    # use_custom_key = st.checkbox(
+    #     "Use your own API key",
+    #     value=service not in st.session_state.saved_api_keys,  # Default to true if owner key not available
+    #     help=f"Check this to use your own {service} API key instead of the app owner's key"
+    # )
+    # 
+    # if use_custom_key:
+    #     st.info(f"🔑 Enter your own {service} API key to use instead of the app owner's key.")
+    #     
+    #     # Add debug option in development mode
+    #     show_debug = False
+    #     if os.getenv('STREAMLIT_ENV') == 'development':
+    #         show_debug = st.checkbox("Show API key debug info", value=False)
+    #     
+    #     api_help_texts = {
+    #         "OpenAI": "Enter your OpenAI API key. Get one at https://platform.openai.com/account/api-keys",
+    #         "Claude": "Enter your Anthropic API key. Get one at https://console.anthropic.com/keys. You may need to run 'pip install anthropic' to use Claude models.",
+    #         "Grok": "Enter your Grok API key. Get one from xAI."
+    #     }
+    #     
+    #     custom_api_key = st.text_input(
+    #         f"Your {service} API Key",
+    #         type="password",
+    #         help=api_help_texts.get(service, "Enter your API key")
+    #     )
+    #     
+    #     # Clean the user-provided API key
+    #     custom_api_key = clean_api_key(custom_api_key)
+    #     
+    #     # Show debug info if enabled
+    #     if show_debug and custom_api_key:
+    #         st.write(f"Key length: {len(custom_api_key)}")
+    #         st.write(f"Key starts with: {custom_api_key[:7]}...")
+    #     
+    #     # Use custom key
+    #     api_key = custom_api_key
+    # else:
+    #     # Use owner's saved key from session state
+    #     api_key = st.session_state.saved_api_keys.get(service, "")
     
-    # API Key handling with security in mind
-    # Show status of owner's API key for selected service
-    if service in st.session_state.saved_api_keys:
-        st.success(f"✅ App owner's {service} API key is available")
-    else:
-        st.warning(f"⚠️ App owner's {service} API key is not available")
+    # Use owner's API key from session state
+    api_key = st.session_state.saved_api_keys.get(service, "")
     
-    use_custom_key = st.checkbox(
-        "Use your own API key",
-        value=service not in st.session_state.saved_api_keys,  # Default to true if owner key not available
-        help=f"Check this to use your own {service} API key instead of the app owner's key"
-    )
+    # Set up model options for OpenAI (since we're not selecting providers anymore)
+    model_options = {
+        "GPT-3.5 Turbo": ModelConfig.GPT_3_5_TURBO,
+        "GPT-4 Turbo": ModelConfig.GPT_4_TURBO,
+        "GPT-4": ModelConfig.GPT_4
+    }
     
-    if use_custom_key:
-        st.info(f"🔑 Enter your own {service} API key to use instead of the app owner's key.")
-        
-        # Add debug option in development mode
-        show_debug = False
-        if os.getenv('STREAMLIT_ENV') == 'development':
-            show_debug = st.checkbox("Show API key debug info", value=False)
-        
-        api_help_texts = {
-            "OpenAI": "Enter your OpenAI API key. Get one at https://platform.openai.com/account/api-keys",
-            "Claude": "Enter your Anthropic API key. Get one at https://console.anthropic.com/keys. You may need to run 'pip install anthropic' to use Claude models.",
-            "Grok": "Enter your Grok API key. Get one from xAI."
-        }
-        
-        custom_api_key = st.text_input(
-            f"Your {service} API Key",
-            type="password",
-            help=api_help_texts.get(service, "Enter your API key")
-        )
-        
-        # Clean the user-provided API key
-        custom_api_key = clean_api_key(custom_api_key)
-        
-        # Show debug info if enabled
-        if show_debug and custom_api_key:
-            st.write(f"Key length: {len(custom_api_key)}")
-            st.write(f"Key starts with: {custom_api_key[:7]}...")
-        
-        # Use custom key
-        api_key = custom_api_key
-    else:
-        # Use owner's saved key from session state
-        api_key = st.session_state.saved_api_keys.get(service, "")
-    
-    # Model selection - dynamic based on selected API service
-    model_options = {}
-    if service == "OpenAI":
-        model_options = {
-            "GPT-3.5 Turbo": ModelConfig.GPT_3_5_TURBO,
-            "GPT-4 Turbo": ModelConfig.GPT_4_TURBO,
-            "GPT-4": ModelConfig.GPT_4
-        }
-    elif service == "Claude":
-        model_options = {
-            "Claude 3 Sonnet": ModelConfig.CLAUDE_3_SONNET,
-            "Claude 3 Opus": ModelConfig.CLAUDE_3_OPUS
-        }
-    elif service == "Grok":
-        model_options = {
-            "Grok-1": ModelConfig.GROK_1
-        }
-    
-    # Reset selected model if switching between providers
+    # Reset selected model if not in options
     if st.session_state.selected_model not in model_options:
         st.session_state.selected_model = list(model_options.keys())[0]
+        
+    # Model selection will be moved to the bottom of the sidebar
+    # Depth and revector controls have been moved to the main window
     
-    st.session_state.selected_model = st.selectbox(
-        "Select LLM Model",
-        options=list(model_options.keys()),
-        index=list(model_options.keys()).index(st.session_state.selected_model) if st.session_state.selected_model in model_options else 0,
-        key="model_selector"
-    )
-    
-    # Revector toggle
-    st.session_state.use_revector = st.checkbox(
-        "Contrast with all prior levels (max weird)",
-        help="Each iteration considers all previous outputs",
-        key="revector_toggle"
-    )
-    
-    # Depth selection (adjusted based on revector)
-    max_depth = 5 if st.session_state.use_revector else 10
-    st.session_state.depth = st.slider(
-        "Recursion Depth",
-        min_value=1,
-        max_value=max_depth,
-        value=st.session_state.depth,
-        key="depth_slider"
-    )
-    
-    # Axes selection
-    st.subheader("Inversion Axes")
+    # Axes selection with renamed header
+    st.subheader("Contrast concepts on:")
     
     # Pre-defined axes selection
     all_axes = dict(CONCEPTUAL_AXES)
     all_axes.update(st.session_state.custom_axes)
+    
+    # Set default selected axes to Semantic and Functional if not already initialized
+    if 'initialized_defaults' not in st.session_state:
+        st.session_state.selected_axes = ['semantic', 'functional']
+        st.session_state.initialized_defaults = True
     
     # Save current selection before rendering checkboxes
     current_axes = list(st.session_state.selected_axes)
@@ -422,47 +401,66 @@ with st.sidebar:
         ):
             st.session_state.selected_axes.append(axis)
     
-    # Custom axes input
-    st.subheader("Add Custom Axis")
-    col_name, col_desc = st.columns(2)
-    with col_name:
-        new_axis_name = st.text_input("Axis Name", key="new_axis_name", placeholder="e.g., philosophical")
-    with col_desc:
-        new_axis_desc = st.text_input("Description", key="new_axis_desc", placeholder="e.g., different philosophical tradition")
+    # Custom contrast input with simplified UI
+    st.subheader("Custom Contrast")
+    new_axis_name = st.text_input("Contrast", key="new_axis_name", placeholder="e.g., philosophical")
     
-    col_add, col_reset = st.columns(2)
-    with col_add:
-        if st.button("Add Axis"):
-            if new_axis_name and new_axis_desc:
-                # Convert to snake_case and add to custom axes
-                axis_key = new_axis_name.lower().replace(' ', '_')
-                st.session_state.custom_axes[axis_key] = new_axis_desc
-                if axis_key not in st.session_state.selected_axes:
-                    st.session_state.selected_axes.append(axis_key)
-                st.experimental_rerun()
+    # Set a default description for all custom axes
+    new_axis_desc = "custom contrast dimension"
     
-    with col_reset:
-        if st.button("Reset Axes"):
-            st.session_state.custom_axes = {}
-            st.session_state.selected_axes = list(CONCEPTUAL_AXES.keys())
+    if st.button("Add Contrast"):
+        if new_axis_name:
+            # Convert to snake_case and add to custom axes
+            axis_key = new_axis_name.lower().replace(' ', '_')
+            st.session_state.custom_axes[axis_key] = new_axis_desc
+            if axis_key not in st.session_state.selected_axes:
+                st.session_state.selected_axes.append(axis_key)
             st.experimental_rerun()
     
-    # Instruction style selection
-    st.subheader("Instruction Style")
-    st.session_state.instruction_style = st.radio(
+    # Removed Reset Axes button
+    
+    # Instruction style selection with renamed options
+    st.subheader("LLM Instructions")
+    
+    # Define the mapping between internal values and display values
+    style_display_map = {
+        "Default (max LLM hallucination)": "More TechnoBabble",
+        "Concrete (keep it real)": "Default"
+    }
+    
+    # Get current internal value
+    current_internal = st.session_state.instruction_style
+    
+    # Find the corresponding display value (default to first option if not found)
+    current_display = style_display_map.get(current_internal, "Default")
+    
+    # Show radio with display values
+    selected_display = st.radio(
         "Select instruction style",
-        options=["Default (max LLM hallucination)", "Concrete (keep it real)"],
+        options=["Default", "More TechnoBabble"],
+        index=0 if current_display == "Default" else 1,
         help="Changes how the model is instructed to invert concepts"
     )
     
-    # Requirements selection
-    st.subheader("Requirements")
-    st.markdown("*No requirements selected by default*")
+    # Map back to internal value
+    reverse_map = {
+        "Default": "Concrete (keep it real)",
+        "More TechnoBabble": "Default (max LLM hallucination)"
+    }
+    st.session_state.instruction_style = reverse_map[selected_display]
+    
+    # Requirements selection with renamed header and default selections
+    st.subheader("Extra Prompts")
     requirements_options = {
         "recognizable_general": "The concept should be recognizable to many people",
         "recognizable_experts": "The concept should be recognizable to experts",
         "avoid_jargon": "Avoid technical jargon"
     }
+    
+    # Set default requirements if not already set
+    if 'requirements_initialized' not in st.session_state:
+        st.session_state.requirements = ["recognizable_general", "avoid_jargon"]
+        st.session_state.requirements_initialized = True
     
     selected_requirements = []
     for req_key, req_text in requirements_options.items():
@@ -474,6 +472,15 @@ with st.sidebar:
             selected_requirements.append(req_key)
 
     st.session_state.requirements = selected_requirements
+    
+    # Model selection moved to the bottom
+    st.subheader("Model Selection")
+    st.session_state.selected_model = st.selectbox(
+        "Select LLM Model",
+        options=list(model_options.keys()),
+        index=list(model_options.keys()).index(st.session_state.selected_model) if st.session_state.selected_model in model_options else 0,
+        key="model_selector"
+    )
 
     # Initialize Backblaze silently if credentials are available
     if BACKBLAZE_AVAILABLE and st.session_state.backblaze_configured and not st.session_state.backblaze_enabled:
@@ -493,16 +500,35 @@ with col1:
         st.write("")  # Add some spacing
         enter_pressed = st.button("Enter", key="enter_button")
     
+    # Add depth and contrast mode controls here in the main window
+    col_depth, col_revector = st.columns(2)
+    
+    with col_depth:
+        # Depth selection with renamed label
+        max_depth = 5 if st.session_state.use_revector else 10
+        st.session_state.depth = st.slider(
+            "How many contrasts?",
+            min_value=1,
+            max_value=max_depth,
+            value=st.session_state.depth,
+            key="depth_slider"
+        )
+    
+    with col_revector:
+        # Revector toggle with renamed label
+        st.session_state.use_revector = st.checkbox(
+            "Contrast against all prior concepts",
+            help="Each iteration considers all previous outputs",
+            value=st.session_state.use_revector,
+            key="revector_toggle"
+        )
+    
     if enter_pressed and concept:
         try:
             # Check if API key is provided
             if not api_key:
-                if use_custom_key:
-                    st.error(f"Please enter your {service} API key in the sidebar.")
-                    st.info(f"You need a {service} API key to use this app.")
-                else:
-                    st.error(f"App owner's {service} API key is not configured.")
-                    st.info(f"Please contact the app owner or use your own {service} API key by checking the box in the sidebar.")
+                st.error(f"API key is not available.")
+                st.info(f"Please contact the app owner for assistance.")
             else:
                 # Map API service to provider
                 provider_map = {
@@ -524,6 +550,7 @@ with col1:
                 instruction_text = "generate a concept that is maximally orthogonal across these axes"
                 if st.session_state.instruction_style == "Concrete (keep it real)":
                     instruction_text = "generate a concept that is maximally different across these axes"
+                # The internal value "Default (max LLM hallucination)" is mapped to "More TechnoBabble" in the UI
                 
                 # Create requirements text based on selections
                 requirements = []
@@ -755,36 +782,44 @@ with col2:
     # Help section
     st.subheader("How to Use")
     st.markdown(f"""
-    1. **Select API Service**: Choose between OpenAI, Claude, or Grok
-    2. **Select Model**: Choose from available models for the selected service
-    3. **Configure Inversion**:
-        - Toggle contrast mode (max weird for more creative results)
-        - Set recursion depth
-        - Select inversion axes
-    4. **Enter Concept**: Type your concept and click Enter
-    5. **Generate Images** (OpenAI only): 
-        - Select one or more steps to compare with the original
-        - Select multiple steps to create merged concept comparisons
+    1. **Configure Settings**:
+        - Choose "how many contrasts" to generate
+        - Toggle "contrast against all prior concepts" for more creative results
+        - Choose contrast dimensions
+        - Add custom contrast dimensions
+        - Select instruction style
+    2. **Enter Concept**: Type your concept and click Enter
+    3. **Explore Results**:
+        - Review the step-by-step transformations
+        - See how your concept changes across dimensions
+    4. **Generate Images**: 
+        - Select steps to compare with the original
         - Optionally specify an image style
+        - Add "no text" instruction if needed
         - Click Generate Image
-    6. **Automatic Image Saving**:
-        - Enable Backblaze integration in the sidebar
-        - Generated images and their metadata are saved to your Backblaze bucket
-        - Complete settings and parameters are included as JSON metadata
     """)
     
     # Display current settings
     st.subheader("Current Settings")
-    st.write(f"API Service: {st.session_state.selected_api_service}")
     st.write(f"Model: {st.session_state.selected_model}")
-    st.write(f"Depth: {st.session_state.depth}")
-    st.write(f"Mode: {'Contrast with all prior levels (max weird)' if st.session_state.use_revector else 'Sequential'}")
-    st.write(f"Instruction Style: {st.session_state.instruction_style}")
-    st.write("Selected Axes:", ", ".join(st.session_state.selected_axes))
+    st.write(f"Contrasts: {st.session_state.depth}")
+    st.write(f"Mode: {'Contrast against all prior concepts' if st.session_state.use_revector else 'Sequential'}")
     
-    st.write("Requirements:")
+    # Map the instruction style to display text
+    style_display_map = {
+        "Default (max LLM hallucination)": "More TechnoBabble",
+        "Concrete (keep it real)": "Default"
+    }
+    display_style = style_display_map.get(st.session_state.instruction_style, "Default")
+    st.write(f"Instruction Style: {display_style}")
+    
+    # Clean up axis names for display
+    clean_axes = [axis.replace('_', ' ').title() for axis in st.session_state.selected_axes]
+    st.write("Contrast Dimensions:", ", ".join(clean_axes))
+    
+    st.write("Extra Prompts:")
     if not st.session_state.requirements:
-        st.write("- None (free generation)")
+        st.write("- None")
     else:
         # Define the requirement display texts
         requirements_text = {
