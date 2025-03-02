@@ -103,6 +103,8 @@ if 'selected_axes' not in st.session_state:
     st.session_state.selected_axes = list(CONCEPTUAL_AXES.keys())
 if 'custom_axes' not in st.session_state:
     st.session_state.custom_axes = {}
+if 'custom_contrast_keys' not in st.session_state:
+    st.session_state.custom_contrast_keys = []
 if 'instruction_style' not in st.session_state:
     st.session_state.instruction_style = "Default"
 if 'requirements' not in st.session_state:
@@ -279,10 +281,16 @@ def save_to_backblaze(image_url, metadata_dict, filename_prefix="concept_inversi
 # Page config is already set at the top of the file
 
 # Title and description
-st.title("Concept Invertor Dashboard")
+st.title("Concept Contrast Image Creator")
 st.markdown("""
-This dashboard allows you to explore concept inversion using different LLM models.
-Input a concept and see how it transforms through various axes of meaning.
+Create interesting images with AI easily. This works by asking the AI for concepts that it finds very different from each other. 
+When you ask AI to make an image between concepts it finds contrasting, it tends to make interesting images. 
+That's because you're working with how it thinks, rather than how you think. 
+
+In the settings you'll find what it's contrasting on, for example, the spatial scale of the concept (Mountain vs Atom).
+You can ask it to do this multiple times. Then the second concept it creates will contrast with the first it creates, not your original concept. And the third with the second, and so on.
+If you check "contrast with all prior contrasts" then the second concept will contrast against the concept you entered and the first concept it created. And the third with your input, the first, and the second, etc.
+
 """)
 
 # Sidebar controls
@@ -380,9 +388,9 @@ with st.sidebar:
     # Axes selection with renamed header
     st.subheader("Contrast concepts on:")
     
-    # Pre-defined axes selection
-    all_axes = dict(CONCEPTUAL_AXES)
-    all_axes.update(st.session_state.custom_axes)
+    # Pre-defined axes selection (ONLY built-in axes, not custom ones)
+    all_axes = dict(CONCEPTUAL_AXES) 
+    # Removed: all_axes.update(st.session_state.custom_axes)
     
     # Set default selected axes to Semantic and Functional if not already initialized
     if 'initialized_defaults' not in st.session_state:
@@ -400,22 +408,49 @@ with st.sidebar:
             key=f"axis_{axis}"
         ):
             st.session_state.selected_axes.append(axis)
+            
+    # Add a custom checkbox whose label gets updated when Add Contrast is clicked
+    # Store the custom label in session state if not already there
+    if 'custom_checkbox_label' not in st.session_state:
+        st.session_state.custom_checkbox_label = "Custom (placeholder)"
+        
+    # Display the custom checkbox with the current label
+    if st.checkbox(
+        st.session_state.custom_checkbox_label,
+        value=False,
+        key="custom_placeholder"
+    ):
+        if "custom_placeholder" not in st.session_state.selected_axes:
+            st.session_state.selected_axes.append("custom_placeholder")
+    else:
+        if "custom_placeholder" in st.session_state.selected_axes:
+            st.session_state.selected_axes.remove("custom_placeholder")
     
     # Custom contrast input with simplified UI
     st.subheader("Custom Contrast")
-    new_axis_name = st.text_input("Contrast", key="new_axis_name", placeholder="e.g., philosophical")
     
     # Set a default description for all custom axes
     new_axis_desc = "custom contrast dimension"
     
+    # Input for the custom contrast
+    new_axis_name = st.text_input("Contrast", 
+                                  key="new_axis_name", 
+                                  placeholder="e.g., philosophical")
+            
+    # Add contrast button updates the custom checkbox label
     if st.button("Add Contrast"):
         if new_axis_name:
-            # Convert to snake_case and add to custom axes
-            axis_key = new_axis_name.lower().replace(' ', '_')
-            st.session_state.custom_axes[axis_key] = new_axis_desc
-            if axis_key not in st.session_state.selected_axes:
-                st.session_state.selected_axes.append(axis_key)
-            st.experimental_rerun()
+            # Get the cleaned name
+            clean_name = new_axis_name.strip()
+            
+            # Update the custom checkbox label to show ONLY the text the user typed
+            st.session_state.custom_checkbox_label = clean_name
+            
+            # Show success message
+            st.success(f"Added '{clean_name}'")
+            
+    # We no longer need to display custom contrasts as separate checkboxes
+    # since we're just using the placeholder checkbox now
     
     # Removed Reset Axes button
     
@@ -495,7 +530,7 @@ with col1:
     # Input concept with Enter button
     col_input, col_button = st.columns([4, 1])
     with col_input:
-        concept = st.text_input("Enter your concept:", value="dada", key="concept_input")
+        concept = st.text_input("Enter your concept:", value="Eating kebabs in paris  with a brazilian footballer", key="concept_input")
     with col_button:
         st.write("")  # Add some spacing
         enter_pressed = st.button("Enter", key="enter_button")
@@ -780,24 +815,22 @@ with col1:
 
 with col2:
     # Help section
-    st.subheader("How to Use")
+    st.subheader("Getting started")
     st.markdown(f"""
-    1. **Configure Settings**:
-        - Choose "how many contrasts" to generate
-        - Toggle "contrast against all prior concepts" for more creative results
-        - Choose contrast dimensions
-        - Add custom contrast dimensions
-        - Select instruction style
-    2. **Enter Concept**: Type your concept and click Enter
-    3. **Explore Results**:
-        - Review the step-by-step transformations
-        - See how your concept changes across dimensions
-    4. **Generate Images**: 
-        - Select steps to compare with the original
-        - Optionally specify an image style
-        - Add "no text" instruction if needed
-        - Click Generate Image
+    1. **Play around with the concept creator
+        - Hit enter a few times with the initial concept
+        - Enter your own concept and do the same.
+        - Generate a few images to see how it works.
+        - You can click a box in the image to make it full screen.
+        - You can save the images to your desktop.
+        - You can choose to create an image that contrast your input against any or all of the AI generated concepts
+    2. ** Play with the settings to see what you like
+        - Try Selecting "contrast against all prior concepts"
+        - Change what it's contrasting the concepts on in the setting.
+        - Change the LLM model if you like.
+    3. ** Have fun. 
     """)
+
     
     # Display current settings
     st.subheader("Current Settings")
