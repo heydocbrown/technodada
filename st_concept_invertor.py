@@ -20,8 +20,11 @@ try:
 except ImportError:
     BACKBLAZE_AVAILABLE = False
 
-# Load environment variables with explicit parameters
-load_dotenv(dotenv_path='.env', override=True)
+# Load environment variables with explicit parameters and absolute path
+import os.path
+env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=env_path, override=True)
+print(f"Loading .env file from: {env_path}")
 
 # Helper function to clean API key (remove quotes and whitespace)
 def clean_api_key(key):
@@ -37,8 +40,8 @@ def clean_api_key(key):
 # Try to load API keys directly from file if environment variable loading fails
 def get_api_key_from_env_file(key_name='OPENAI_API_KEY'):
     try:
-        if os.path.isfile('.env'):
-            with open('.env', 'r') as f:
+        if os.path.isfile(env_path):
+            with open(env_path, 'r') as f:
                 env_content = f.read()
                 # Join multiple lines if the key is split across lines
                 env_content = re.sub(r'\n\s*', '', env_content)
@@ -54,7 +57,7 @@ def get_api_key_from_env_file(key_name='OPENAI_API_KEY'):
     return None
 
 # Check if .env file exists
-env_file_exists = os.path.isfile('.env')
+env_file_exists = os.path.isfile(env_path)
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
