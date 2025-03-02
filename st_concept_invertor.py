@@ -20,11 +20,10 @@ try:
 except ImportError:
     BACKBLAZE_AVAILABLE = False
 
-# Load environment variables with explicit parameters and absolute path
-import os.path
-env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-load_dotenv(dotenv_path=env_path, override=True)
-print(f"Loading .env file from: {env_path}")
+# Helper function to get API keys from multiple sources with priority:
+# 1. Streamlit secrets (for cloud deployment)
+# 2. Environment variables (set by user)
+# 3. Local .env file (for local development)
 
 # Helper function to clean API key (remove quotes and whitespace)
 def clean_api_key(key):
@@ -37,27 +36,50 @@ def clean_api_key(key):
         key = key[1:-1]
     return key.strip()
 
-# Try to load API keys directly from file if environment variable loading fails
-def get_api_key_from_env_file(key_name='OPENAI_API_KEY'):
+def get_api_key(key_name):
+    """Get API key from Streamlit secrets, environment variables, or .env file"""
+    # Priority 1: Check Streamlit secrets (for cloud deployment)
     try:
+        if hasattr(st, 'secrets') and key_name in st.secrets:
+            print(f"Found {key_name} in Streamlit secrets")
+            return clean_api_key(st.secrets[key_name])
+    except Exception as e:
+        print(f"Error accessing Streamlit secrets: {str(e)}")
+    
+    # Priority 2: Check environment variables
+    env_key = os.environ.get(key_name)
+    if env_key:
+        print(f"Found {key_name} in environment variables")
+        return clean_api_key(env_key)
+    
+    # Priority 3: Check local .env file (for local development)
+    try:
+        # Look for .env file in the same directory as the script
+        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
         if os.path.isfile(env_path):
+            # Try loading with python-dotenv
+            load_dotenv(dotenv_path=env_path, override=True)
+            # Check if environment variable is now set
+            env_key = os.environ.get(key_name)
+            if env_key:
+                print(f"Loaded {key_name} from .env using python-dotenv")
+                return clean_api_key(env_key)
+            
+            # If not, try manually parsing the file
             with open(env_path, 'r') as f:
                 env_content = f.read()
-                # Join multiple lines if the key is split across lines
                 env_content = re.sub(r'\n\s*', '', env_content)
-                
-                # Look for the specified key in the content
                 match = re.search(f'{key_name}=(?:"([^"]*)"|\'([^\']*)\'|([^\s]*))', env_content)
                 if match:
-                    # Get the first non-None group (the API key)
                     key = next((g for g in match.groups() if g is not None), '')
-                    return key.strip()
+                    if key:
+                        print(f"Loaded {key_name} from .env by direct parsing")
+                        return clean_api_key(key)
     except Exception as e:
-        print(f"Error reading API key from .env file: {str(e)}")
-    return None
-
-# Check if .env file exists
-env_file_exists = os.path.isfile(env_path)
+        print(f"Error reading .env file: {str(e)}")
+    
+    print(f"Could not find {key_name} in any location")
+    return ''
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
@@ -103,47 +125,25 @@ api_services = {
     "Backblaze": {"env_key": "BACKBLAZE_APPLICATION_KEY", "loaded": False, "id_key": "BACKBLAZE_APPLICATION_KEY_ID", "bucket": "BACKBLAZE_BUCKET_NAME"}
 }
 
-# Load API keys from environment or direct file read
+# Load API keys using our new helper function
 for service, config in api_services.items():
     key_name = config["env_key"]
-    # Get key from environment
-    env_api_key = os.getenv(key_name, '')
-    env_api_key = clean_api_key(env_api_key)
-    
-    # If not found in env, try direct file read
-    if not env_api_key and env_file_exists:
-        direct_key = get_api_key_from_env_file(key_name)
-        if direct_key:
-            env_api_key = direct_key
-            print(f"{key_name} loaded directly from .env file")
+    # Get API key from all possible sources
+    api_key = get_api_key(key_name)
     
     # Store in session state if key found
-    if env_api_key:
-        print(f"{key_name} loaded (length: {len(env_api_key)})")
-        st.session_state.saved_api_keys[service] = env_api_key
+    if api_key:
+        print(f"{key_name} loaded (length: {len(api_key)})")
+        st.session_state.saved_api_keys[service] = api_key
         api_services[service]["loaded"] = True
         
         # Special handling for Backblaze which requires key ID and bucket name
         if service == "Backblaze" and BACKBLAZE_AVAILABLE:
-            # Get key ID from environment
-            key_id = os.getenv(config["id_key"], '')
-            key_id = clean_api_key(key_id)
+            # Get key ID
+            key_id = get_api_key(config["id_key"])
             
-            # If not found in env, try direct file read
-            if not key_id and env_file_exists:
-                direct_id = get_api_key_from_env_file(config["id_key"])
-                if direct_id:
-                    key_id = direct_id
-            
-            # Get bucket name from environment
-            bucket_name = os.getenv(config["bucket"], '')
-            bucket_name = clean_api_key(bucket_name)
-            
-            # If not found in env, try direct file read
-            if not bucket_name and env_file_exists:
-                direct_bucket = get_api_key_from_env_file(config["bucket"])
-                if direct_bucket:
-                    bucket_name = direct_bucket
+            # Get bucket name
+            bucket_name = get_api_key(config["bucket"])
             
             # Store Backblaze credentials in session state
             if key_id and bucket_name:

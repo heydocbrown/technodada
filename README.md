@@ -22,9 +22,11 @@ A concept inversion system that explores the transformation of ideas across mult
 
 ## Setup
 
+### Local Development
+
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/technodada.git
+   git clone https://github.com/heydocbrown/technodada.git
    cd technodada
    ```
 
@@ -36,19 +38,50 @@ A concept inversion system that explores the transformation of ideas across mult
 
 3. Install dependencies:
    ```bash
-   pip install streamlit openai python-dotenv
+   pip install -r requirements.txt
    ```
 
-4. Create a `.env` file in the project root and add your OpenAI API key:
+4. Create a `.env` file in the project root and add your API keys:
    ```
-   OPENAI_API_KEY=your_api_key_here
+   OPENAI_API_KEY=your_openai_api_key_here
+   ANTHROPIC_API_KEY=your_anthropic_api_key_here
+   GROK_API_KEY=your_grok_api_key_here
+   
+   # Backblaze credentials (optional)
+   BACKBLAZE_APPLICATION_KEY_ID=your_backblaze_key_id
+   BACKBLAZE_APPLICATION_KEY=your_backblaze_application_key
+   BACKBLAZE_BUCKET_NAME=your_backblaze_bucket_name
    ```
+
+### Streamlit Cloud Deployment
+
+When deploying to Streamlit Cloud, you need to set up your API keys as secrets:
+
+1. Create a file named `.streamlit/secrets.toml` locally (do not commit to git):
+   ```toml
+   OPENAI_API_KEY = "your_openai_api_key_here"
+   ANTHROPIC_API_KEY = "your_anthropic_api_key_here"
+   GROK_API_KEY = "your_grok_api_key_here"
+   
+   # Backblaze credentials (optional)
+   BACKBLAZE_APPLICATION_KEY_ID = "your_backblaze_key_id"
+   BACKBLAZE_APPLICATION_KEY = "your_backblaze_application_key"
+   BACKBLAZE_BUCKET_NAME = "your_backblaze_bucket_name"
+   ```
+
+2. In the Streamlit Cloud dashboard:
+   - Go to your app settings
+   - Navigate to the "Secrets" section
+   - Paste the contents of your `secrets.toml` file
+   - Click "Save"
+
+The app will now be able to access these secrets in the cloud environment.
 
 ## Usage
 
 1. Run the Streamlit dashboard:
    ```bash
-   streamlit run app.py
+   streamlit run st_concept_invertor.py
    ```
 
 2. Access the dashboard in your browser at `http://localhost:8501`
@@ -65,7 +98,7 @@ A concept inversion system that explores the transformation of ideas across mult
 
 ## Project Structure
 
-- `app.py` - Main Streamlit dashboard application
+- `st_concept_invertor.py` - Main Streamlit dashboard application
 - `matty_invertor_v2/` - Core inversion system
   - `__init__.py` - Package initialization
   - `invertor.py` - Main invertor implementation
