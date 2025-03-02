@@ -2,6 +2,14 @@
 # Created for Streamlit Cloud Deployment
 
 import streamlit as st
+
+# Page config must come first
+st.set_page_config(
+    page_title="Concept Invertor Dashboard",
+    page_icon="🔄",
+    layout="wide"
+)
+
 from matty_invertor_v2 import MattyInvertor, ModelProvider, ModelConfig, CONCEPTUAL_AXES
 import os
 from dotenv import load_dotenv
@@ -20,11 +28,6 @@ try:
 except ImportError:
     BACKBLAZE_AVAILABLE = False
 
-# Helper function to get API keys from multiple sources with priority:
-# 1. Streamlit secrets (for cloud deployment)
-# 2. Environment variables (set by user)
-# 3. Local .env file (for local development)
-
 # Helper function to clean API key (remove quotes and whitespace)
 def clean_api_key(key):
     if not key:
@@ -37,46 +40,54 @@ def clean_api_key(key):
     return key.strip()
 
 def get_api_key(key_name):
-    """Get API key from Streamlit secrets, environment variables, or .env file"""
-    # Priority 1: Check Streamlit secrets (for cloud deployment)
+    """Get API key with a simpler, more reliable approach"""
+    # Set the path to the .env file (absolute path for better reliability)
+    env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+    
+    # First try loading from the .env file using python-dotenv
+    if os.path.exists(env_path):
+        try:
+            # Load .env file which sets environment variables
+            load_dotenv(dotenv_path=env_path, override=True)
+            print(f"Loaded .env file from: {env_path}")
+        except Exception as e:
+            print(f"Error loading .env file: {str(e)}")
+    
+    # Get from environment (either pre-existing or set by dotenv)
+    api_key = os.environ.get(key_name, '')
+    if api_key:
+        print(f"Found {key_name} in environment variables (length: {len(api_key)})")
+        return clean_api_key(api_key)
+    
+    # If running on Streamlit Cloud, check secrets
+    # This is wrapped in a try/except to handle cases where secrets aren't initialized yet
     try:
-        if hasattr(st, 'secrets') and key_name in st.secrets:
-            print(f"Found {key_name} in Streamlit secrets")
-            return clean_api_key(st.secrets[key_name])
+        if hasattr(st, 'secrets'):
+            secrets_dict = st.secrets
+            if key_name in secrets_dict:
+                print(f"Found {key_name} in Streamlit secrets")
+                return clean_api_key(secrets_dict[key_name])
     except Exception as e:
         print(f"Error accessing Streamlit secrets: {str(e)}")
     
-    # Priority 2: Check environment variables
-    env_key = os.environ.get(key_name)
-    if env_key:
-        print(f"Found {key_name} in environment variables")
-        return clean_api_key(env_key)
-    
-    # Priority 3: Check local .env file (for local development)
+    # If all else fails, try direct file reading as a last resort
     try:
-        # Look for .env file in the same directory as the script
-        env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
         if os.path.isfile(env_path):
-            # Try loading with python-dotenv
-            load_dotenv(dotenv_path=env_path, override=True)
-            # Check if environment variable is now set
-            env_key = os.environ.get(key_name)
-            if env_key:
-                print(f"Loaded {key_name} from .env using python-dotenv")
-                return clean_api_key(env_key)
-            
-            # If not, try manually parsing the file
             with open(env_path, 'r') as f:
                 env_content = f.read()
+                # Join multiple lines if the key is split across lines
                 env_content = re.sub(r'\n\s*', '', env_content)
-                match = re.search(f'{key_name}=(?:"([^"]*)"|\'([^\']*)\'|([^\s]*))', env_content)
+                
+                # Look for the specified key in the content
+                match = re.search(f'{key_name}=(?:"([^"]*)"|\'([^\']*)\'|([^\\s]*))', env_content)
                 if match:
+                    # Get the first non-None group (the API key)
                     key = next((g for g in match.groups() if g is not None), '')
                     if key:
-                        print(f"Loaded {key_name} from .env by direct parsing")
+                        print(f"Loaded {key_name} directly from .env file (length: {len(key)})")
                         return clean_api_key(key)
     except Exception as e:
-        print(f"Error reading .env file: {str(e)}")
+        print(f"Error reading API key from .env file: {str(e)}")
     
     print(f"Could not find {key_name} in any location")
     return ''
@@ -265,12 +276,7 @@ def save_to_backblaze(image_url, metadata_dict, filename_prefix="concept_inversi
     except Exception as e:
         return False, f"Error saving to Backblaze: {str(e)}", {}
 
-# Page config
-st.set_page_config(
-    page_title="Concept Invertor Dashboard",
-    page_icon="🔄",
-    layout="wide"
-)
+# Page config is already set at the top of the file
 
 # Title and description
 st.title("Concept Invertor Dashboard")
