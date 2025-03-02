@@ -2,4 +2,6 @@ streamlit>=1.42.0
 openai>=1.64.0
 python-dotenv>=1.0.0
 anthropic>=0.21.0
-# xai-grok package may be required for Grok models (package name may change) 
+# xai-grok package may be required for Grok models (package name may change)
+b2sdk>=1.29.0
+streamlit-aggrid>=0.3.3 

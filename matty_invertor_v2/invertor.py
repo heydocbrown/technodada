@@ -174,7 +174,7 @@ class MattyInvertor:
         # Return single concept for depth=1, list otherwise
         return history[0] if depth == 1 else history
 
-    def generate_contrast_image(self, concept1, concept2, is_revector=False):
+    def generate_contrast_image(self, concept1, concept2, is_revector=False, custom_prompt=None):
         """Generate an image showing the contrast between two concepts."""
         if isinstance(concept2, list):
             if is_revector:  # Previously is_mci_v3
@@ -196,7 +196,11 @@ class MattyInvertor:
         concept1 = concept1.replace('Concept name:', '').replace('Concept Name:', '').strip()
         concept2 = concept2.replace('Concept name:', '').replace('Concept Name:', '').strip()
         
-        prompt = f"A split image showing the contrast between: {concept1} VS {concept2}"
+        # Use custom prompt if provided, otherwise use the default
+        if custom_prompt:
+            prompt = custom_prompt
+        else:
+            prompt = f"A split image showing the contrast between: {concept1} VS {concept2}"
         
         if self.provider == ModelProvider.CURSOR:
             response = self.client.generate_image(prompt)

@@ -37,4 +37,15 @@ env/
 
 # OS
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Backblaze utilities
+backblaze_utils.py
+check_backblaze.py
+
+# Downloaded images and data
+downloaded_images/
+downloads/
+
+# Image Management directory
+matty_invertor_v2/Image_management/ 
