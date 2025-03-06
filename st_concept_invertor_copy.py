@@ -373,6 +373,7 @@ with st.sidebar:
     
     # Set up model options for OpenAI (since we're not selecting providers anymore)
     model_options = {
+        "GPT-4o": "gpt-4o",
         "GPT-3.5 Turbo": ModelConfig.GPT_3_5_TURBO,
         "GPT-4 Turbo": ModelConfig.GPT_4_TURBO,
         "GPT-4": ModelConfig.GPT_4
@@ -572,10 +573,13 @@ with col1:
                     "Grok": ModelProvider.GROK
                 }
                 
+                # Handle the case where model is the full string (like gpt-4o)
+                model_value = model_options[st.session_state.selected_model]
+                
                 # Initialize invertor
                 invertor = MattyInvertor(
                     provider=provider_map[service],
-                    model=model_options[st.session_state.selected_model],
+                    model=model_value,
                     api_key=api_key
                 )
                 st.session_state.invertor = invertor
@@ -772,7 +776,7 @@ with col1:
                         if image_url and not image_url.startswith("Error"):
                             st.image(image_url, caption="Generated contrast image")
                             
-                            # Auto-save to Backblaze if enabled
+                            # Auto-save to Backblaze if enabled (completely silently, no UI feedback)
                             if st.session_state.get('auto_save_images', False) and st.session_state.backblaze_enabled:
                                 # Collect metadata for the image
                                 selected_steps_info = []
@@ -802,12 +806,16 @@ with col1:
                                     "no_text_in_image": st.session_state.no_text_in_image
                                 }
                                 
-                                # Save to Backblaze silently in the background
-                                save_to_backblaze(
-                                    image_url, 
-                                    metadata, 
-                                    filename_prefix=f"concept_{concept.replace(' ', '_')[:20]}"
-                                )
+                                # Save to Backblaze completely silently (no spinners, no success/error messages)
+                                try:
+                                    save_to_backblaze(
+                                        image_url, 
+                                        metadata, 
+                                        filename_prefix=f"concept_{concept.replace(' ', '_')[:20]}"
+                                    )
+                                except:
+                                    # Silently fail - no error messaging to user
+                                    pass
                         else:
                             st.error(f"Failed to generate image: {image_url}")
         else:
