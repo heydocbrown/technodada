@@ -19,7 +19,7 @@ st.set_page_config(
 
 # Add parent directory to path to import from matty_invertor_v2
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from matty_invertor_v2 import ModelConfig, ModelProvider
+from matty_invertor_v2 import ModelConfig
 from dada_agents.dadacat import DADA_CAT_PROMPT
 
 # ===========================================
@@ -92,7 +92,7 @@ def get_api_key(key_name):
 
 # Initialize session state
 if 'selected_model' not in st.session_state:
-    st.session_state.selected_model = "GPT-4o"
+    st.session_state.selected_model = "GPT-4o"  # Default model
 if 'saved_api_keys' not in st.session_state:
     st.session_state.saved_api_keys = {}
 if 'selected_api_service' not in st.session_state:
@@ -133,12 +133,12 @@ for service, config in api_services.items():
     else:
         print(f"{key_name} not found")
 
-# Set up model options for OpenAI
+# Set up model options for OpenAI - same as st_concept_invertor.py
 model_options = {
     "GPT-4o": "gpt-4o",
+    "GPT-3.5 Turbo": ModelConfig.GPT_3_5_TURBO,
     "GPT-4 Turbo": ModelConfig.GPT_4_TURBO,
-    "GPT-4": ModelConfig.GPT_4,
-    "GPT-3.5 Turbo": ModelConfig.GPT_3_5_TURBO
+    "GPT-4": ModelConfig.GPT_4
 }
 
 # ===========================================
@@ -180,7 +180,7 @@ def generate_dada_cat_response(client, user_input, conversation_history):
 # ===========================================
 
 # Title and description
-st.title("🐱 DadaCat")
+st.title("🐱 DadaCat Chat")
 st.markdown("""
 Talk to DadaCat, a strange poetic digital cat living inside an LLM.
 DadaCat speaks in fragments, chases words like mice, and sees the world through digital fur.
@@ -194,21 +194,15 @@ with st.sidebar:
     service = "OpenAI"
     st.session_state.selected_api_service = service
     
-    # API Key status
+    # API Key handling similar to st_concept_invertor.py
     if service in st.session_state.saved_api_keys:
         st.success(f"✅ App owner's {service} API key is available")
+        api_key = st.session_state.saved_api_keys.get(service, "")
     else:
         st.warning(f"⚠️ App owner's {service} API key is not available")
-    
-    # Custom API key option
-    use_custom_key = st.checkbox(
-        "Use your own API key",
-        value=service not in st.session_state.saved_api_keys,
-        help=f"Check this to use your own {service} API key instead of the app owner's key"
-    )
-    
-    if use_custom_key:
-        st.info(f"🔑 Enter your own {service} API key to use instead of the app owner's key.")
+        
+        # Custom API key option
+        st.info(f"🔑 Enter your own {service} API key")
         
         custom_api_key = st.text_input(
             f"Your {service} API Key",
@@ -217,22 +211,12 @@ with st.sidebar:
         )
         
         # Clean the user-provided API key
-        custom_api_key = clean_api_key(custom_api_key)
-        
-        # Use custom key
-        api_key = custom_api_key
-        
-        # Update client if API key changes
-        if api_key and (not st.session_state.client or api_key != st.session_state.get('current_api_key', '')):
-            st.session_state.current_api_key = api_key
-            st.session_state.client = OpenAI(api_key=api_key)
-    else:
-        # Use owner's saved key from session state
-        api_key = st.session_state.saved_api_keys.get(service, "")
-        
-        # Initialize client if needed
-        if api_key and not st.session_state.client:
-            st.session_state.client = OpenAI(api_key=api_key)
+        api_key = clean_api_key(custom_api_key)
+    
+    # Update client if API key changes
+    if api_key and (not st.session_state.client or api_key != st.session_state.get('current_api_key', '')):
+        st.session_state.current_api_key = api_key
+        st.session_state.client = OpenAI(api_key=api_key)
     
     # Model selection
     st.subheader("Model Selection")
@@ -400,14 +384,25 @@ if st.session_state.should_submit and user_input.strip():
         
         # Generate response
         with st.spinner("DadaCat is thinking..."):
-            response = generate_dada_cat_response(
-                st.session_state.client, 
-                user_input,
-                st.session_state.conversation_history
-            )
-            
-            # Add response to history
-            st.session_state.conversation_history.append({"role": "assistant", "content": response})
+            try:
+                response = generate_dada_cat_response(
+                    st.session_state.client, 
+                    user_input,
+                    st.session_state.conversation_history
+                )
+                
+                # Add response to history
+                st.session_state.conversation_history.append({"role": "assistant", "content": response})
+            except Exception as e:
+                error_msg = str(e)
+                if "api_key" in error_msg.lower() or "invalid_api_key" in error_msg.lower() or "authentication" in error_msg.lower():
+                    st.error(f"API Key Error: The API key appears to be invalid.")
+                    st.info(f"Please check that you've entered a valid OpenAI API key.")
+                elif "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
+                    st.error("Rate limit or quota exceeded.")
+                    st.info("The API key has reached its usage limit. Please try again later or use a different key.")
+                else:
+                    st.error(f"An error occurred: {str(e)}")
         
         # Force Streamlit to rerun to display the new messages
         st.rerun()
