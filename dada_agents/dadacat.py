@@ -8,13 +8,16 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load environment variables from .env file
-load_dotenv()
+try:
+    load_dotenv()
+except Exception:
+    pass
 
-# Set up OpenAI API Key
-API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not API_KEY:
-    raise ValueError("Please set the OPENAI_API_KEY in the .env file")
+# Don't require API key here - the st_dadacat.py file will handle API key management
+# so we can remove this validation to avoid errors on Streamlit Cloud
+# API_KEY = os.getenv("OPENAI_API_KEY")
+# if not API_KEY:
+#     raise ValueError("Please set the OPENAI_API_KEY in the .env file")
 
 # Define the Dada Cat personality as a prompt
 DADA_CAT_PROMPT = """
@@ -120,9 +123,17 @@ You will now respond as Dada Cat.
 MODELS = ["gpt-4o", "gpt-4", "gpt-3.5-turbo"]
 
 # Function to generate response from GPT models
-def generate_dada_cat_response(user_input):
+# This is now just kept for backward compatibility
+# The st_dadacat.py file will use its own implementation
+def generate_dada_cat_response(user_input, api_key=None):
+    # Fetch API key from environment if not provided
+    if api_key is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            return "meow... dada cat needs an API key to talk. please provide one."
+    
     # Initialize OpenAI client
-    client = openai.OpenAI(api_key=API_KEY)
+    client = openai.OpenAI(api_key=api_key)
     
     # Try models in order of preference
     for model in MODELS:
@@ -178,15 +189,23 @@ def run_dada_cat_interactive():
         if user_input.lower() in ["exit", "quit"]:
             print("Dada Cat says goodbye... *vanishes in a cloud of digital fur*")
             break
-        dada_response = generate_dada_cat_response(user_input)
+        # Get API key from environment for CLI usage
+        api_key = os.getenv("OPENAI_API_KEY")
+        dada_response = generate_dada_cat_response(user_input, api_key=api_key)
         print("Dada Cat:", dada_response)
 
-# Example usage
+# Example usage - only run when executed directly
 if __name__ == "__main__":
     # Check if we have the required packages
     if not check_requirements():
         print("Please install the required packages and try again.")
         sys.exit(1)
     
+    # Check for API key
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("Please set the OPENAI_API_KEY in the .env file")
+        sys.exit(1)
+        
     # Run the interactive chat
     run_dada_cat_interactive()
