@@ -37,17 +37,19 @@ except ImportError:
 
 # System prompts
 SYSTEM_CONCEPT_EXTRACTION = "You are an expert at extracting concepts from images and aligning them to conceptual axes."
-SYSTEM_CONCEPT_SYNTHESIS = "You are an expert at synthesizing abstract concepts from multidimensional conceptual descriptions."
-SYSTEM_CONCEPT_INVERSION = "You are an expert at generating maximally orthogonal concepts."
+SYSTEM_CONCEPT_SYNTHESIS = "You are an expert at synthesizing concepts from multidimensional conceptual descriptions."
+SYSTEM_CONCEPT_INVERSION = "You are an expert at generating maximally different concepts."
 SYSTEM_CONCEPT_SUMMARY = "You are an expert at distilling complex concepts into concise summaries."
 
 # User prompts
 PROMPT_EXTRACT_CONCEPTS = "Please describe the core concepts of this image, and break them down into these axes: Semantic, Functional, Causal, Spatial/Temporal, Conceptual/Abstract, Perceptual, Emotional, Technological vs Natural, Scale, Deterministic vs Stochastic."
-PROMPT_SYNTHESIZE_CONCEPT = "Given this detailed breakdown of an image across multiple conceptual axes, please create a single unified concept that captures the core meaning and message implied by all these axes combined:\n\n{description}"
-PROMPT_INVERT_CONCEPT = "Given this concept: '{corpus}', generate a concept that is maximally orthogonal across these axes: Semantic, Functional, Causal, Spatial/Temporal, Conceptual/Abstract."
-PROMPT_SUMMARIZE_CONCEPT = "Summarize this concept in {max_words} words or less, capturing its essence:\n\n{concept}"
+PROMPT_SYNTHESIZE_CONCEPT = "Given this detailed breakdown of an image across multiple conceptual axes, please create a single unified concept that captures the core meaning and message implied by these axes:\n\n{axes_descriptions}"
+PROMPT_INVERT_CONCEPT = "Given this concept: '{concept}', generate a concept that is maximally different across these axes:\n\n{axes_list}"
+#PROMPT_SUMMARIZE_CONCEPT = "Given this concept: '{corpus}', generate a concept in {max_words} words or less that is maximally different across all these axes combined:\n\n{description}"
+
+PROMPT_SUMMARIZE_CONCEPT = "Summarize this concept: '{concept}' in as few words as possible and no more than {max_words} words, capturing its essence along these dimensions:\n\n{axes_descriptions}"
 PROMPT_GENERATE_IMAGE = "Create a surreal image representing the concept: {concept}"
-PROMPT_GENERATE_CONTRAST = "Create an image that visually contrasts these two opposing concepts: '{original_concept}' versus '{inverted_concept}'. Show the duality and tension between them in a single unified composition."
+PROMPT_GENERATE_CONTRAST = "Create an image that visually contrasts these two concepts: '{original_concept}' versus '{inverted_concept}.'"#Show the duality and tension between them in a single unified composition."
 
 # ===========================================
 # INITIALIZATION
@@ -307,11 +309,23 @@ def create_concise_summary(client, concept, max_words=10):
     # Use the selected model
     model = model_options.get(st.session_state.selected_model, "gpt-4o")
     
+    # Get the selected axes for the summary prompt
+    selected_axes = []
+    if 'axes_checkboxes' in st.session_state:
+        selected_axes = [axis for axis, is_selected in st.session_state.axes_checkboxes.items() if is_selected]
+    
+    # Format the axes descriptions as a list
+    axes_descriptions = ", ".join(selected_axes) if selected_axes else "Semantic, Functional, Conceptual/Abstract"
+    
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_CONCEPT_SUMMARY},
-            {"role": "user", "content": PROMPT_SUMMARIZE_CONCEPT.format(max_words=max_words, concept=concept)}
+            {"role": "user", "content": PROMPT_SUMMARIZE_CONCEPT.format(
+                max_words=max_words, 
+                concept=concept, 
+                axes_descriptions=axes_descriptions
+            )}
         ]
     )
     return response.choices[0].message.content
@@ -345,26 +359,40 @@ def combine_axes_into_single_concept(client, axes):
     # Use the selected model
     model = model_options.get(st.session_state.selected_model, "gpt-4o")
     
-    description = "\n".join([f"{axis}: {concept}" for axis, concept in axes.items()])
+    # Format the axes descriptions as a list with name and content
+    axes_descriptions = "\n".join([f"{axis}: {concept}" for axis, concept in axes.items()])
+    
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_CONCEPT_SYNTHESIS},
-            {"role": "user", "content": PROMPT_SYNTHESIZE_CONCEPT.format(description=description)}
+            {"role": "user", "content": PROMPT_SYNTHESIZE_CONCEPT.format(axes_descriptions=axes_descriptions)}
         ]
     )
     return response.choices[0].message.content
 
 # Generate an orthogonal concept using prompt engineering
-def run_mci1(client, corpus):
+def run_mci1(client, concept):
     # Use the selected model
     model = model_options.get(st.session_state.selected_model, "gpt-4o")
+    
+    # Get the selected axes from session state
+    selected_axes = []
+    if 'axes_checkboxes' in st.session_state:
+        selected_axes = [axis for axis, is_selected in st.session_state.axes_checkboxes.items() if is_selected]
+    
+    # If no axes are selected, use default ones
+    if not selected_axes:
+        selected_axes = ["Semantic", "Functional", "Causal", "Spatial/Temporal", "Conceptual/Abstract"]
+    
+    # Format the axes list
+    axes_list = ", ".join(selected_axes)
     
     response = client.chat.completions.create(
         model=model,
         messages=[
             {"role": "system", "content": SYSTEM_CONCEPT_INVERSION},
-            {"role": "user", "content": PROMPT_INVERT_CONCEPT.format(corpus=corpus)}
+            {"role": "user", "content": PROMPT_INVERT_CONCEPT.format(concept=concept, axes_list=axes_list)}
         ]
     )
     return response.choices[0].message.content
@@ -589,6 +617,9 @@ if 'show_concept_editor' in st.session_state and st.session_state.show_concept_e
             st.write("") # Add blank line after each axis for readability
     
     # Generate a unified concept button
+    # Debug option to show the prompt details
+    show_debug_info = st.checkbox("Show debug information", value=False, key="show_debug")
+
     if st.button("Synthesize Unified Concept"):
         with st.spinner("Synthesizing a unified concept..."):
             # Filter axes based on checkboxes
@@ -596,6 +627,13 @@ if 'show_concept_editor' in st.session_state and st.session_state.show_concept_e
                             if st.session_state.axes_checkboxes.get(axis, True)}
             
             if selected_axes:
+                # Format axes descriptions for debug view
+                axes_descriptions = "\n".join([f"{axis}: {concept}" for axis, concept in selected_axes.items()])
+                
+                # Save to session state for debug view
+                st.session_state.last_axes_descriptions = axes_descriptions
+                
+                # Create unified concept
                 unified_concept = combine_axes_into_single_concept(client, selected_axes)
                 st.session_state.unified_concept = unified_concept
                 
@@ -606,6 +644,11 @@ if 'show_concept_editor' in st.session_state and st.session_state.show_concept_e
                 st.session_state.show_unified_concept = True
             else:
                 st.warning("Please select at least one conceptual axis to synthesize a concept.")
+    
+    # Show debug information if enabled
+    if st.session_state.get("show_debug", False) and "last_axes_descriptions" in st.session_state:
+        with st.expander("Debug: Axes Descriptions Used in Prompt", expanded=True):
+            st.text_area("Axes Descriptions", st.session_state.last_axes_descriptions, height=250, disabled=True)
 
 # Show unified concept if we have it
 if 'show_unified_concept' in st.session_state and st.session_state.show_unified_concept:
@@ -661,6 +704,15 @@ if 'show_generate' in st.session_state and st.session_state.show_generate:
     if invert_concept and st.button("Generate Inverted Concept"):
         with st.spinner("Generating an inverted concept..."):
             try:
+                # Get the selected axes for debugging
+                selected_axes = []
+                if 'axes_checkboxes' in st.session_state:
+                    selected_axes = [axis for axis, is_selected in st.session_state.axes_checkboxes.items() if is_selected]
+                
+                # Format the axes list for debug view
+                axes_list = ", ".join(selected_axes)
+                st.session_state.last_inversion_axes = axes_list
+                
                 # Generate inverted concept using run_mci1
                 inverted_concept = run_mci1(client, final_concept)
                 st.session_state.inverted_concept = inverted_concept
@@ -673,6 +725,11 @@ if 'show_generate' in st.session_state and st.session_state.show_generate:
                 st.rerun()  # Rerun to show the inverted concept editor
             except Exception as e:
                 st.error(f"Error generating inverted concept: {e}")
+                
+    # Show debug information for inversion if enabled and available
+    if st.session_state.get("show_debug", False) and "last_inversion_axes" in st.session_state:
+        with st.expander("Debug: Axes Used for Inversion", expanded=True):
+            st.text_area("Axes List", st.session_state.last_inversion_axes, height=100, disabled=True)
     
     # Show inverted concept editor if available
     if 'show_inverted' in st.session_state and st.session_state.show_inverted:
@@ -750,7 +807,7 @@ if 'show_generate' in st.session_state and st.session_state.show_generate:
     # Only show inverted and contrast options if we have an inverted concept
     if 'show_inverted' in st.session_state and st.session_state.show_inverted:
         with col2:
-            if st.button("Regenerate Inverted Image"):
+            if st.button("Generate Inverted Image"):
                 with st.spinner("Generating image from inverted concept..."):
                     try:
                         # Determine which inverted concept version to use based on user selection
@@ -779,7 +836,7 @@ if 'show_generate' in st.session_state and st.session_state.show_generate:
                         st.error(f"Error generating image: {e}")
         
         with col3:
-            if st.button("Regenerate Contrasting Image"):
+            if st.button("Generate Contrasting Image"):
                 with st.spinner("Generating image contrasting both concepts..."):
                     try:
                         # Determine which original concept version to use
