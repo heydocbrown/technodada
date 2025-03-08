@@ -260,17 +260,23 @@ st.markdown("""
     background-color: #fafafa;
 }
 
-/* Make all text white by default */
+/* Basic Streamlit element styling */
 body, .stMarkdown, p, div, label, span, button, textarea, input, select {
     color: white !important;
 }
 
-/* But make the text in chat message bubbles black specifically */
-.message-bubble {
+/* Message bubble styling - ensure ALL text inside is black */
+.message-bubble, .message-bubble * {
     color: black !important;
 }
 
-/* Make the textarea text white */
+/* Override any nested elements to make sure they're all black too */
+.message-bubble p, .message-bubble div, .message-bubble span, 
+.message-bubble strong, .message-bubble em, .message-bubble a {
+    color: black !important;
+}
+
+/* Input area styling */
 [data-testid="stTextArea"] textarea {
     color: white !important;
 }
@@ -286,10 +292,12 @@ with conversation_container:
             col1, col2 = st.columns([7, 1])
             with col1:
                 # Style the user message with a light blue background and black text
+                # Replace newlines with <br> tags to preserve formatting
+                formatted_content = message['content'].replace('\n', '<br>')
                 st.markdown(
                     f"""
-                    <div class="message-bubble" style="background-color: #e6f3ff; padding: 10px; border-radius: 10px; text-align: right; color: #000000; font-weight: 500;">
-                    {message['content']}
+                    <div class="message-bubble" style="background-color: #e6f3ff; padding: 10px; border-radius: 10px; text-align: right; color: #000000 !important; font-weight: 500;">
+                    {formatted_content}
                     </div>
                     """, 
                     unsafe_allow_html=True
@@ -305,10 +313,12 @@ with conversation_container:
                 st.markdown("### 🐱")
             with col2:
                 # Style the DadaCat message with a light background and black text
+                # Replace newlines with <br> tags to preserve formatting
+                formatted_content = message['content'].replace('\n', '<br>')
                 st.markdown(
                     f"""
-                    <div class="message-bubble" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; color: #000000; font-weight: 500;">
-                    {message['content']}
+                    <div class="message-bubble" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; color: #000000 !important; font-weight: 500;">
+                    {formatted_content}
                     </div>
                     """, 
                     unsafe_allow_html=True
