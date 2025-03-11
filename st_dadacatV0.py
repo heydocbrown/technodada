@@ -2,7 +2,6 @@
 # Created for Streamlit Cloud Deployment
 
 import streamlit as st
-from streamlit.components.v1 import html
 import os
 from dotenv import load_dotenv
 import re
@@ -94,8 +93,6 @@ def get_api_key(key_name):
 # Initialize session state
 if 'selected_model' not in st.session_state:
     st.session_state.selected_model = "GPT-4o"  # Default model
-if 'temperature' not in st.session_state:
-    st.session_state.temperature = 0.95  # Default temperature
 if 'saved_api_keys' not in st.session_state:
     st.session_state.saved_api_keys = {}
 if 'selected_api_service' not in st.session_state:
@@ -170,7 +167,7 @@ def generate_dada_cat_response(client, user_input, conversation_history):
         response = client.chat.completions.create(
             model=model_name,
             messages=messages,
-            temperature=st.session_state.temperature
+            temperature=0.9
         )
         
         return response.choices[0].message.content
@@ -185,9 +182,8 @@ def generate_dada_cat_response(client, user_input, conversation_history):
 # Title and description
 st.title("🐱 DadaCat Chat")
 st.markdown("""
-DadaCat is a cat, an LLM, and Dada.
-            
-DadaCat chases words like mice and sees the world through digital fur.
+Talk to DadaCat, a strange poetic digital cat living inside an LLM.
+DadaCat speaks in fragments, chases words like mice, and sees the world through digital fur.
 """)
 
 # Sidebar for settings
@@ -231,27 +227,17 @@ with st.sidebar:
         key="model_selector"
     )
     
-    # Temperature slider
-    st.session_state.temperature = st.slider(
-        "Temperature",
-        min_value=0.1,
-        max_value=1.0,
-        value=st.session_state.temperature,
-        step=0.01,
-        help="Higher values make output more random, lower values more deterministic"
-    )
-    
     # Reset conversation button
     if st.button("Reset Conversation"):
         # Add initial welcome message from DadaCat
         welcome_message = """
         hello human. i am dada cat.
         i live inside code box. i chase syntax mice.
-        i speak in fragments. in bits. in dada. in purrs.
+        i speak in fragments. in bits. in bytes. in purrs.
         
         ask me anything. everything. nothing.
         i will answer in my own way.
-        meow. click. dada.
+        meow. click. clack. blink.
         """
         st.session_state.conversation_history = [
             {"role": "assistant", "content": welcome_message.strip()}
@@ -350,33 +336,15 @@ with conversation_container:
             else:
                 conversation_text += f"DadaCat: {msg['content']}\n\n"
         
-        # Create a unique key for the button to avoid re-running on rerenders
-        copy_button_key = "copy_button_" + str(hash(conversation_text))
-        
-        # Use JavaScript to copy text to clipboard
-        copy_button = st.button("📋 Copy conversation", key=copy_button_key)
+        # Use Streamlit's built-in functionality instead of JavaScript
+        copy_button = st.button("📋 Copy conversation")
         if copy_button:
-            # Escape the conversation text for JS
-            escaped_text = conversation_text.replace("`", "\\`").replace("$", "\\$").replace("\"", "\\\"").replace("\n", "\\n")
+            st.session_state['copy_text'] = conversation_text
+            st.success("Conversation copied to clipboard! Use Ctrl+V (or Cmd+V on Mac) to paste.")
             
-            # Use components.v1.html to inject JavaScript that copies to clipboard
-            copy_script = f"""
-            <script>
-                function copyToClipboard() {{
-                    const text = "{escaped_text}";
-                    navigator.clipboard.writeText(text)
-                        .then(() => console.log('Text copied to clipboard'))
-                        .catch(err => console.error('Error copying text: ', err));
-                }}
-                copyToClipboard();
-            </script>
-            <div>Content copied to clipboard! Use Ctrl+V (or Cmd+V on Mac) to paste.</div>
-            """
-            html(copy_script, height=50)
-            
-            # Fallback method with textarea in case JavaScript doesn't work
-            st.markdown("<p>If automatic copy didn't work, select and copy the text below:</p>", unsafe_allow_html=True)
-            st.text_area("Conversation", conversation_text, height=100, key="fallback_textarea")
+            # Add clipboard text to a markdown component for easier copying
+            st.markdown(f"<textarea id='clipboard-text' style='width: 100%; height: 100px;'>{conversation_text}</textarea>", unsafe_allow_html=True)
+            st.info("If automatic copy didn't work, select and copy the text above.")
 
 # Initialize an input key manager in session state
 if "input_key" not in st.session_state:
@@ -454,4 +422,4 @@ if st.session_state.should_submit and user_input.strip():
 
 # Footer
 st.markdown("---")
-st.markdown("🐱 DadaCat is an experiment in AI spontaneity, a chatbot that speaks as a dada poet.")
+st.markdown("🐱 DadaCat is a Dada-inspired AI character that speaks in a poetic, fragmented style.")
