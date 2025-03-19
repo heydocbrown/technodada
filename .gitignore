@@ -49,3 +49,25 @@ downloads/
 
 # Image Management directory
 matty_invertor_v2/Image_management/ 
+
+# Design documents
+design_docs/
+
+# Temporary images
+temp_*.jpeg
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+packaged.yaml
+
+# DynamoDB local
+dynamodb-data/
+
+# Metrics data
+**/metrics/*.json
+**/metrics/*.html
+
+# Output files
+output.txt
+function.zip

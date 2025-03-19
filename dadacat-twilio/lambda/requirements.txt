@@ -1,0 +1,6 @@
+# AWS Lambda function dependencies
+boto3>=1.26.0
+twilio>=7.16.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+requests>=2.28.2

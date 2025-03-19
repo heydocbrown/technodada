@@ -1,0 +1,206 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: DadaCat Twilio integration infrastructure
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Deployment environment
+
+  OpenAIApiKey:
+    Type: String
+    NoEcho: true
+    Description: OpenAI API key
+
+  TwilioAccountSid:
+    Type: String
+    NoEcho: true
+    Description: Twilio account SID
+
+  TwilioAuthToken:
+    Type: String
+    NoEcho: true
+    Description: Twilio auth token
+
+  TwilioPhoneNumber:
+    Type: String
+    Description: Twilio phone number
+
+Resources:
+  # Lambda Function
+  DadaCatTwilioFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda/
+      Handler: handler.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
+          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
+          DYNAMODB_TABLE: !Ref ConversationsTable
+          SNS_TOPIC_ARN: !Ref NotificationsTopic
+          SQS_QUEUE_URL: !Ref DeadLetterQueue
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /webhook
+            Method: post
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConversationsTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationsTopic.TopicName
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt DeadLetterQueue.QueueName
+  
+  # DynamoDB Table
+  ConversationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub dadacat-conversations-${Environment}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+  
+  # SNS Topic for Notifications
+  NotificationsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub dadacat-notifications-${Environment}
+      DisplayName: DadaCat Notifications
+  
+  # Admin Email Subscription
+  AdminEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref NotificationsTopic
+      Endpoint: !Sub dbrownte@gmail.com  # Replace with actual email
+  
+  # Dead Letter Queue
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dadacat-dlq-${Environment}
+      MessageRetentionPeriod: 1209600  # 14 days
+      VisibilityTimeout: 300
+  
+  # CloudWatch Dashboard
+  DadaCatDashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: !Sub DadaCat-${Environment}
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {
+              "type": "metric",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["DadaCatTwilio", "MessageCount", { "stat": "Sum" }],
+                  ["DadaCatTwilio", "ResponseTime", { "stat": "Average" }]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "DadaCat Activity"
+              }
+            },
+            {
+              "type": "metric",
+              "x": 12,
+              "y": 0,
+              "width": 12,
+              "height": 6,
+              "properties": {
+                "metrics": [
+                  ["DadaCatTwilio", "ErrorCount", { "stat": "Sum" }],
+                  ["DadaCatTwilio", "APICost", { "stat": "Sum" }]
+                ],
+                "view": "timeSeries",
+                "region": "${AWS::Region}",
+                "title": "Errors and Costs"
+              }
+            },
+            {
+              "type": "log",
+              "x": 0,
+              "y": 6,
+              "width": 24,
+              "height": 6,
+              "properties": {
+                "query": "SOURCE '/aws/lambda/${DadaCatTwilioFunction}' | filter @message like /ERROR/",
+                "region": "${AWS::Region}",
+                "title": "Error Logs",
+                "view": "table"
+              }
+            }
+          ]
+        }
+
+  # CloudWatch Alarm for Errors
+  ErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub DadaCat-Errors-${Environment}
+      AlarmDescription: Alert when error count exceeds threshold
+      MetricName: ErrorCount
+      Namespace: DadaCatTwilio
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref NotificationsTopic
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL for the DadaCat Twilio webhook
+    Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook
+
+  LambdaFunction:
+    Description: Lambda function name
+    Value: !Ref DadaCatTwilioFunction
+
+  DynamoDBTable:
+    Description: DynamoDB table name
+    Value: !Ref ConversationsTable
+
+  SNSTopic:
+    Description: SNS topic ARN
+    Value: !Ref NotificationsTopic
+
+  DeadLetterQueueURL:
+    Description: Dead letter queue URL
+    Value: !Ref DeadLetterQueue
+
+  Dashboard:
+    Description: CloudWatch dashboard URL
+    Value: !Sub https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#dashboards:name=${DadaCatDashboard}
