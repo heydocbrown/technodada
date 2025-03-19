@@ -32,7 +32,7 @@ Parameters:
     Description: Twilio phone number
 
 Resources:
-  # Lambda Function
+  # Webhook Lambda Function
   DadaCatTwilioFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -42,17 +42,16 @@ Resources:
       Architectures:
         - x86_64
       MemorySize: 256
-      Timeout: 30
+      Timeout: 10  # Reduced timeout since we're just queuing messages
       Environment:
         Variables:
           ENVIRONMENT: !Ref Environment
-          OPENAI_API_KEY: !Ref OpenAIApiKey
           TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
           TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
-          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
           DYNAMODB_TABLE: !Ref ConversationsTable
           SNS_TOPIC_ARN: !Ref NotificationsTopic
-          SQS_QUEUE_URL: !Ref DeadLetterQueue
+          SQS_QUEUE_URL: !Ref MessageProcessingQueue
+          MESSAGE_PROCESSING_ASYNC: 'true'
       Events:
         ApiEvent:
           Type: Api
@@ -65,7 +64,49 @@ Resources:
         - SNSPublishMessagePolicy:
             TopicName: !GetAtt NotificationsTopic.TopicName
         - SQSSendMessagePolicy:
+            QueueName: !GetAtt MessageProcessingQueue.QueueName
+  
+  # Message Processing Lambda Function
+  DadaCatProcessingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../lambda/
+      Handler: processor.lambda_handler
+      Runtime: python3.12
+      Architectures:
+        - x86_64
+      MemorySize: 512  # More memory for OpenAI processing
+      Timeout: 600  # 10 minutes timeout for processing
+      Environment:
+        Variables:
+          ENVIRONMENT: !Ref Environment
+          OPENAI_API_KEY: !Ref OpenAIApiKey
+          TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
+          TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
+          DYNAMODB_TABLE: !Ref ConversationsTable
+          SNS_TOPIC_ARN: !Ref NotificationsTopic
+          SQS_QUEUE_URL: !Ref DeadLetterQueue
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt MessageProcessingQueue.Arn
+            BatchSize: 1
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ConversationsTable
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt NotificationsTopic.TopicName
+        - SQSSendMessagePolicy:
             QueueName: !GetAtt DeadLetterQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ReceiveMessage
+              Resource: !GetAtt MessageProcessingQueue.Arn
   
   # DynamoDB Table
   ConversationsTable:
@@ -107,6 +148,17 @@ Resources:
       QueueName: !Sub dadacat-dlq-${Environment}
       MessageRetentionPeriod: 1209600  # 14 days
       VisibilityTimeout: 300
+  
+  # Message Processing Queue
+  MessageProcessingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dadacat-processing-queue-${Environment}
+      MessageRetentionPeriod: 345600  # 4 days
+      VisibilityTimeout: 900  # 15 minutes
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
   
   # CloudWatch Dashboard
   DadaCatDashboard:
@@ -185,9 +237,13 @@ Outputs:
     Description: API Gateway endpoint URL for the DadaCat Twilio webhook
     Value: !Sub https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/webhook
 
-  LambdaFunction:
-    Description: Lambda function name
+  WebhookLambdaFunction:
+    Description: Webhook Lambda function name
     Value: !Ref DadaCatTwilioFunction
+
+  ProcessingLambdaFunction:
+    Description: Processing Lambda function name
+    Value: !Ref DadaCatProcessingFunction
 
   DynamoDBTable:
     Description: DynamoDB table name
@@ -196,6 +252,10 @@ Outputs:
   SNSTopic:
     Description: SNS topic ARN
     Value: !Ref NotificationsTopic
+
+  ProcessingQueueURL:
+    Description: Message processing queue URL
+    Value: !Ref MessageProcessingQueue
 
   DeadLetterQueueURL:
     Description: Dead letter queue URL
