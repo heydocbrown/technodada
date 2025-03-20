@@ -26,6 +26,7 @@ class ErrorCategory(Enum):
     AUTHENTICATION = "authentication"
     VALIDATION = "validation"
     INTERNAL = "internal"
+    PROCESSING_ERROR = "processing_error"
     UNKNOWN = "unknown"
 
 

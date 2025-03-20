@@ -1,0 +1,1 @@
+{"statusCode": 200, "headers": {"Content-Type": "application/xml"}, "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>Meow? (DadaCat is running in synchronous mode, which is not recommended.)</Message></Response>"}

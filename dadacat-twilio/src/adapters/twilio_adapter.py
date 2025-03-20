@@ -83,11 +83,18 @@ class TwilioAdapter(MessageAdapter):
                 from_number = parsed_form.get('From', [''])[0]
                 body = parsed_form.get('Body', [''])[0]
                 num_media = int(parsed_form.get('NumMedia', ['0'])[0])
+                self.logger.info(f"Extracted from parsed body - from_number: '{from_number}', body: '{body}'")
             else:
                 # Direct request params
                 from_number = request_data.get('From', '')
                 body = request_data.get('Body', '')
                 num_media = int(request_data.get('NumMedia', 0))
+                self.logger.info(f"Extracted from direct params - from_number: '{from_number}', body: '{body}'")
+                
+            # Validate phone number format
+            if not from_number or not from_number.startswith('+'):
+                self.logger.error(f"Invalid phone number format extracted from Twilio request: '{from_number}' - Must start with + and contain country code")
+                # Continue processing to catch this in the logs, but expect it to fail later
             
             # Extract media URLs if present
             media_urls = []

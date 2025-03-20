@@ -18,7 +18,7 @@ from .error_handling.notifier import AdminNotifier
 from .analytics.engagement import EngagementTracker
 from .analytics.errors import ErrorTracker
 from .analytics.costs import CostTracker
-from .utils.logging import configure_logging
+from .utils.custom_logging import configure_logging
 from .utils.rate_limiter import RateLimiter
 
 

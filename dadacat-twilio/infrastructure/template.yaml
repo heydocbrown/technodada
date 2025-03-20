@@ -36,9 +36,8 @@ Resources:
   DadaCatTwilioFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../lambda/
-      Handler: handler.lambda_handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/dadacat-twilio-webhook:latest
       Architectures:
         - x86_64
       MemorySize: 256
@@ -48,10 +47,14 @@ Resources:
           ENVIRONMENT: !Ref Environment
           TWILIO_ACCOUNT_SID: !Ref TwilioAccountSid
           TWILIO_AUTH_TOKEN: !Ref TwilioAuthToken
+          TWILIO_PHONE_NUMBER: !Ref TwilioPhoneNumber
           DYNAMODB_TABLE: !Ref ConversationsTable
           SNS_TOPIC_ARN: !Ref NotificationsTopic
           SQS_QUEUE_URL: !Ref MessageProcessingQueue
           MESSAGE_PROCESSING_ASYNC: 'true'
+          ANALYTICS_ENABLED: 'true'
+          ANALYTICS_NAMESPACE: 'DadaCatTwilio'
+          AWS_REGION: !Ref AWS::Region
       Events:
         ApiEvent:
           Type: Api
@@ -65,14 +68,19 @@ Resources:
             TopicName: !GetAtt NotificationsTopic.TopicName
         - SQSSendMessagePolicy:
             QueueName: !GetAtt MessageProcessingQueue.QueueName
+    Metadata:
+      DockerTag: latest
+      DockerContext: ..
+      Dockerfile: dadacat-twilio/docker/Dockerfile
+      DockerBuildArgs:
+        FUNCTION_NAME: handler.lambda_handler
   
   # Message Processing Lambda Function
   DadaCatProcessingFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ../lambda/
-      Handler: processor.lambda_handler
-      Runtime: python3.12
+      PackageType: Image
+      ImageUri: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/dadacat-twilio-processor:latest
       Architectures:
         - x86_64
       MemorySize: 512  # More memory for OpenAI processing
@@ -87,6 +95,8 @@ Resources:
           DYNAMODB_TABLE: !Ref ConversationsTable
           SNS_TOPIC_ARN: !Ref NotificationsTopic
           SQS_QUEUE_URL: !Ref DeadLetterQueue
+          ANALYTICS_ENABLED: 'true'
+          ANALYTICS_NAMESPACE: 'DadaCatTwilio'
       Events:
         SQSEvent:
           Type: SQS
@@ -107,6 +117,12 @@ Resources:
                 - sqs:GetQueueAttributes
                 - sqs:ReceiveMessage
               Resource: !GetAtt MessageProcessingQueue.Arn
+    Metadata:
+      DockerTag: latest
+      DockerContext: ..
+      Dockerfile: dadacat-twilio/docker/Dockerfile
+      DockerBuildArgs:
+        FUNCTION_NAME: processor.lambda_handler
   
   # DynamoDB Table
   ConversationsTable:

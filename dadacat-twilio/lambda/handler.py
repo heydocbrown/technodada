@@ -134,6 +134,15 @@ def process_message_async(request_data: Dict[str, Any]) -> Dict[str, Any]:
         incoming_message = request_data.get('body', '').strip()
         from_number = request_data.get('from', '')
         
+        # Log the exact phone number extracted from the Twilio request
+        logger.info(f"Extracted phone number: '{from_number}'")
+        logger.info(f"Incoming message: '{incoming_message}'")
+        
+        # Validate the phone number format
+        if not from_number or not from_number.startswith('+'):
+            logger.error(f"Invalid phone number format from Twilio request: '{from_number}' - Must start with + and contain country code")
+            # Continue processing to catch this in the logs, but expect it to fail later
+        
         # Add user message to conversation first
         conversation_manager.add_user_message(
             user_id=from_number,
@@ -164,8 +173,11 @@ def process_message_async(request_data: Dict[str, Any]) -> Dict[str, Any]:
             'timestamp': datetime.now().isoformat()
         }
         
+        # Log the data being sent to SQS
+        logger.info(f"Sending data to SQS: user_id='{message_data['user_id']}', message='{message_data['message']}'")
+        
         # Send message to SQS
-        sqs_client.send_message(
+        response = sqs_client.send_message(
             QueueUrl=SQS_QUEUE_URL,
             MessageBody=json.dumps(message_data),
             MessageAttributes={
@@ -176,11 +188,12 @@ def process_message_async(request_data: Dict[str, Any]) -> Dict[str, Any]:
             }
         )
         
+        logger.info(f"Message sent to SQS with MessageId: {response.get('MessageId')}")
+        
         logger.info(f"Message from {from_number} queued for processing")
         
-        # Create immediate response
+        # Create immediate response - using empty/minimal response to avoid extra message
         twilio_response = MessagingResponse()
-        twilio_response.message("I'm thinking about that... I'll respond in a moment\! 🤔")
         
         return {
             'statusCode': 200,
